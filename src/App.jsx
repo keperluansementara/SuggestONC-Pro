@@ -880,7 +880,7 @@ export default function App() {
 
             {/* --- BAGIAN LOGO KANAN ATAS --- */}
             <img
-              src="/SHP.png"
+              src="SHP.png"
               alt="Profile"
               className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm bg-slate-100 p-0.5"
             />
@@ -1364,11 +1364,14 @@ export default function App() {
                   <div className="max-w-4xl mx-auto animate-in fade-in duration-500 pt-4 pb-12">
                     <div className="bg-white rounded-[24px] shadow-sm border border-slate-200 overflow-hidden">
                       {/* Banner Header dengan Logo */}
-                      <div className="h-40 bg-gradient-to-r from-blue-600 to-cyan-500 relative overflow-hidden">
+                      <div className="h-40 bg-gradient-to-r from-blue-600 to-cyan-500 relative">
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
-                        <div className="absolute -bottom-12 left-8 w-24 h-24 bg-white rounded-[1.5rem] shadow-lg border-4 border-white flex items-center justify-center z-10 p-2 overflow-hidden">
-                          <img src="/SHP.png" alt="SHP Logo" className="w-full h-full object-contain" />
+
+                        {/* KOTAK LOGO YANG DISESUAIKAN LEBARNYA AGAR PAS (TIDAK TERLALU LEBAR) */}
+                        <div className="absolute -bottom-12 left-8 md:left-10 w-[200px] md:w-[240px] h-[90px] md:h-[110px] bg-white rounded-3xl shadow-xl border-[4px] border-white flex items-center justify-center z-10 overflow-hidden p-1">
+                          <img src="SHP.png" alt="SHP Logo" className="w-full h-full object-contain scale-[1.35] drop-shadow-sm" />
                         </div>
+
                         <div className="absolute top-4 right-4 flex gap-2">
                           <span className="bg-black/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-white text-[10px] font-black uppercase tracking-widest">
                             Internal Use Only
@@ -1380,7 +1383,8 @@ export default function App() {
                       </div>
 
                       {/* Content About */}
-                      <div className="pt-16 p-8 md:p-10">
+                      {/* PADDING ATAS (pt-24) DITAMBAH AGAR TEKS TIDAK TERTIMPA LOGO YANG LEBIH BESAR */}
+                      <div className="px-8 pb-8 pt-24 md:px-10 md:pb-10 md:pt-28">
                         <h3 className="text-3xl font-black text-slate-800 tracking-tight mb-3 uppercase">Aplikasi Survei & Validasi Toko</h3>
                         <p className="text-slate-600 text-sm font-medium leading-relaxed mb-8 max-w-3xl">
                           Sistem informasi berbasis <strong>Geographic Information System (GIS)</strong> yang dirancang khusus untuk mempermudah proses pemetaan, pencatatan data lapangan, pengambilan dokumentasi, dan validasi lokasi toko secara real-time. Aplikasi ini terintegrasi penuh dengan <strong>Google Workspace (Google Sheets & Drive)</strong> sebagai database cloud untuk memastikan data yang dikumpulkan oleh surveyor di lapangan langsung tersedia bagi tim back-office tanpa delay.
