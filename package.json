@@ -1,5 +1,6 @@
 {
   "name": "suggestonc-pro",
+  "homepage": "https://keperluansementara.github.io/SuggestONC-Pro",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -31,6 +32,5 @@
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
     "vite": "^7.3.1"
-  },
-  "homepage": "https://keperluansementara.github.io/SuggestONC-Pro"
+  }
 }

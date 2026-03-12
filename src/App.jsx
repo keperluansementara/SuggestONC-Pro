@@ -688,11 +688,20 @@ export default function App() {
     );
   };
 
+
+  // =========================================================================================
+  // SISTEM FILTER PUSAT (MEMPERBAIKI BUG PENCARIAN DI MAP, GALLERY, DAN SUCCESS TAB)
+  // =========================================================================================
+
+  // 1. Filter Khusus Untuk Pencarian Teks (Search Bar) - Berlaku Global
+  const searchMatch = (s) => !searchQuery || Object.values(s).some(value => String(value).toLowerCase().includes(searchQuery.toLowerCase()));
+
+  // 2. Filter Untuk TAB LIST VALIDASI
   let filteredStores = stores.filter(s => {
-    const searchMatch = !searchQuery || Object.values(s).some(value => String(value).toLowerCase().includes(searchQuery.toLowerCase()));
-    const statusMatch = statusFilter === 'all' ? true : (statusFilter === 'done' ? (s.isDone || s.outboxId) : (!s.isDone && !s.outboxId));
-    const kecMatch = selectedKecamatans.length === 0 || selectedKecamatans.includes(s.kecamatan || 'LAINNYA');
-    return searchMatch && statusMatch && kecMatch;
+    const isSearchMatch = searchMatch(s);
+    const isStatusMatch = statusFilter === 'all' ? true : (statusFilter === 'done' ? (s.isDone || s.outboxId) : (!s.isDone && !s.outboxId));
+    const isKecMatch = selectedKecamatans.length === 0 || selectedKecamatans.includes(s.kecamatan || 'LAINNYA');
+    return isSearchMatch && isStatusMatch && isKecMatch;
   });
 
   if (statusFilter === 'done' && !sortByNearest) filteredStores.sort((a, b) => parseDateForSort(b.timestamp) - parseDateForSort(a.timestamp));
@@ -709,11 +718,24 @@ export default function App() {
   const uniqueKecamatans = [...new Set(stores.map(s => s.kecamatan || 'LAINNYA'))].sort();
   const groupedDataFull = stores.reduce((acc, s) => { const k = s.kecamatan || 'LAINNYA'; if (!acc[k]) acc[k] = []; acc[k].push(s); return acc; }, {});
 
-  const galleryStores = stores.filter(s => (s.isDone || s.outboxId) && s.photo).sort((a, b) => parseDateForSort(b.timestamp) - parseDateForSort(a.timestamp));
-  const successStores = stores.filter(s => s.isDone || s.outboxId).sort((a, b) => parseDateForSort(b.timestamp) - parseDateForSort(a.timestamp));
+  // 3. BASE DATA UNTUK TAB LAINNYA & DASHBOARD (Tanpa Filter)
+  const successStores = stores.filter(s => s.isDone || s.outboxId);
+  const galleryStores = stores.filter(s => (s.isDone || s.outboxId) && s.photo);
 
-  const filteredGalleryStores = galleryStores.filter(s => galleryFilter === 'all' ? true : s.onc === galleryFilter);
-  const filteredSuccessStores = successStores.filter(s => successFilter === 'all' ? true : s.onc === successFilter);
+  // 4. Filter Untuk TAB MAP OF LOCATION (Sekarang terhubung ke Search Bar!)
+  const mapStores = stores.filter(s => searchMatch(s));
+
+  // 5. Filter Untuk TAB DATA GALLERY (Sekarang terhubung ke Search Bar!)
+  const filteredGalleryStores = galleryStores.filter(s => {
+    return searchMatch(s) && (galleryFilter === 'all' ? true : s.onc === galleryFilter);
+  }).sort((a, b) => parseDateForSort(b.timestamp) - parseDateForSort(a.timestamp));
+
+  // 6. Filter Untuk TAB LIST TOKO SUKSES (Sekarang terhubung ke Search Bar!)
+  const filteredSuccessStores = successStores.filter(s => {
+    return searchMatch(s) && (successFilter === 'all' ? true : s.onc === successFilter);
+  }).sort((a, b) => parseDateForSort(b.timestamp) - parseDateForSort(a.timestamp));
+
+  // =========================================================================================
 
   const isFormValid = formData.surveyorName.trim().length > 1 && formData.photo !== null;
 
@@ -757,6 +779,14 @@ export default function App() {
     setAuthRole('guest'); localStorage.removeItem('shp_auth_role');
   }
 
+  // Menentukan Teks Placeholder di Search Bar Berdasarkan Menu Aktif
+  const getSearchPlaceholder = () => {
+    if (activeMenu === 'map') return "Cari Toko/Daerah di Peta...";
+    if (activeMenu === 'gallery') return "Cari nama toko/surveyor...";
+    if (activeMenu === 'success') return "Cari data validasi...";
+    return "Search Data Toko...";
+  }
+
   // --- LAYAR LOGIN ---
   if (authRole === 'guest') {
     return (
@@ -765,7 +795,7 @@ export default function App() {
           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-blue-600 to-cyan-500"></div>
           <div className="relative z-10 flex flex-col items-center pt-8">
             <div className="w-24 h-24 bg-white rounded-2xl shadow-md border-[4px] border-white flex items-center justify-center p-2 mb-6">
-              <img src="/SHP.png" alt="Logo" className="w-full h-full object-contain scale-[1.3] drop-shadow-sm" />
+              <img src="SHP.png" alt="Logo" className="w-full h-full object-contain scale-[1.3] drop-shadow-sm" />
             </div>
             <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight text-center">Login Sistem Survei</h1>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 mb-8 text-center">Internal Use Only</p>
@@ -836,7 +866,7 @@ export default function App() {
           <div className="flex-1 max-w-lg mx-4">
             <div className="relative group">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input type="text" placeholder={activeMenu === 'map' ? "Search Map of Location" : "Search Data..."} className="w-full bg-slate-100 rounded-lg py-2 pl-10 pr-4 text-sm outline-none border border-transparent focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <input type="text" placeholder={getSearchPlaceholder()} className="w-full bg-slate-100 rounded-lg py-2 pl-10 pr-4 text-sm outline-none border border-transparent focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
           </div>
 
@@ -855,7 +885,7 @@ export default function App() {
             <button onClick={fetchData} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors" title="Sync Data dari Cloud">
               <RefreshCw size={18} className={loading ? 'animate-spin text-blue-600' : ''} />
             </button>
-            <div className="w-8 h-8 rounded-full border border-slate-200 overflow-hidden bg-white p-0.5"><img src="/SHP.png" alt="Profile" className="w-full h-full object-contain scale-[1.3]" /></div>
+            <div className="w-8 h-8 rounded-full border border-slate-200 overflow-hidden bg-white p-0.5"><img src="SHP.png" alt="Profile" className="w-full h-full object-contain scale-[1.3]" /></div>
           </div>
         </header>
 
@@ -971,7 +1001,8 @@ export default function App() {
                         <button className="px-5 py-2 text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-800 border-r border-slate-200 hover:bg-slate-200 transition-colors">Peta</button>
                         <button className="px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-50 transition-colors">Satelit</button>
                       </div>
-                      <GlobalMap stores={stores} onMarkerClick={setSelectedMapStore} isScriptsReady={isScriptsReady} />
+                      {/* --- MAP SEKARANG MENGGUNAKAN mapStores YANG TERHUBUNG KE SEARCH BAR --- */}
+                      <GlobalMap stores={mapStores} onMarkerClick={setSelectedMapStore} isScriptsReady={isScriptsReady} />
                     </div>
 
                     {/* SIDE PANEL DETAIL TOKO */}
@@ -1213,7 +1244,7 @@ export default function App() {
                       <div className="h-40 bg-gradient-to-r from-blue-600 to-cyan-500 relative">
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
                         <div className="absolute -bottom-12 left-8 md:left-10 w-[200px] md:w-[240px] h-[90px] md:h-[110px] bg-white rounded-3xl shadow-xl border-[4px] border-white flex items-center justify-center z-10 overflow-hidden p-1">
-                          <img src="/SHP.png" alt="SHP Logo" className="w-full h-full object-contain scale-[1.35] drop-shadow-sm" />
+                          <img src="SHP.png" alt="SHP Logo" className="w-full h-full object-contain scale-[1.35] drop-shadow-sm" />
                         </div>
                         <div className="absolute top-4 right-4 flex gap-2">
                           <span className="bg-black/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-white text-[10px] font-black uppercase tracking-widest">Internal Use Only</span>
