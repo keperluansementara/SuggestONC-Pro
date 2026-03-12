@@ -6,7 +6,7 @@ const repoName = "SuggestONC-Pro"
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: process.env.GITHUB_PAGES ? "/SuggestONC-Pro/" : "/",
+  base: "/SuggestONC-Pro/",
   server: {
     host: true,
     port: 5173,
