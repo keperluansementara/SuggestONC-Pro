@@ -400,7 +400,7 @@ const StoreCard = ({ store, onClick, currentDistance }) => {
         {!isNaN(lat) && !isNaN(lng) ? (
           <iframe
             title={`map-${store.id}`}
-            loading="lazy" // <--- TAMBAHAN PENTING UNTUK PERFORMA
+            loading="lazy"
             className="w-full h-full pointer-events-none absolute inset-0"
             src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.003}%2C${lat - 0.003}%2C${lng + 0.003}%2C${lat + 0.003}&layer=mapnik&marker=${lat}%2C${lng}`}
           ></iframe>
@@ -881,12 +881,10 @@ export default function App() {
             {/* --- BAGIAN LOGO KANAN ATAS YANG DIRUBAH --- */}
             {/* Ganti URL_LOGO_ANDA di bawah ini dengan link gambar logo Anda. */}
             <img
-              src="SHP.png"
+              src="/SHP.png" // DITAMBAHKAN GARIS MIRING DISINI
               alt="Profile"
               className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm bg-slate-100 p-0.5"
             />
-            {/* Jika Anda hanya ingin mengganti hurufnya, gunakan kode lama ini dan ganti huruf 'S' nya: */}
-            {/* <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm">S</div> */}
 
           </div>
         </header>
@@ -1571,7 +1569,7 @@ export default function App() {
                   onClick={() => setSelectedSuccessStore(null)}
                   className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs uppercase py-3.5 rounded-xl transition-colors active:scale-95"
                 >
-                  Tutup Detail
+                  <X size={16} /> Tutup Detail
                 </button>
               </div>
             </div>
