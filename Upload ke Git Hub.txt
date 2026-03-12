@@ -7,9 +7,14 @@ git commit -m "update Fitur"
 git pull origin main --rebase
 git push origin main
 
+-- lalu deploy ulang:
+npm run build
+npm run deploy
+
+--------------
 
 -- tambahan running deploy develop di github & production di vercel:
-Development:
+Development: (optional)
 git checkout dev
 npm run dev
 
@@ -18,9 +23,7 @@ git checkout main
 git merge dev
 git push
 
--- lalu deploy ulang:
-npm run build
-npm run deploy
+
 
 Website GitHub Pages akan otomatis update.
 
