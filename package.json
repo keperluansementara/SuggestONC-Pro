@@ -1,5 +1,5 @@
 {
-  "name": "aplikasi-survei",
+  "name": "suggestonc-pro",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
@@ -30,5 +31,5 @@
     "tailwindcss": "^3.4.19",
     "vite": "^7.3.1"
   },
-  "homepage": "https://keperluansementara.github.io/suggestonc"
+  "homepage": "https://keperluansementara.github.io/SuggestONC-Pro"
 }
