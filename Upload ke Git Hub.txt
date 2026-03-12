@@ -14,3 +14,11 @@ npm run build
 npm run deploy
 
 Website GitHub Pages akan otomatis update.
+
+--------------
+Cek Posisi Remote Git:
+git remote -v
+
+rubah remote ke repo yang baru :
+git remote set-url origin https://github.com/keperluansementara/SuggestONC-Pro.git  //sesuaikan linknya
+
