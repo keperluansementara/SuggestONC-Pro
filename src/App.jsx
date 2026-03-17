@@ -462,12 +462,11 @@ export default function App() {
       const mappedStores = masterData.map((item, index) => {
         const storeName = item['Nama Toko'] || item['name'] || '';
         const pendingRecord = localOutbox.find(o => o.storeName === storeName);
-        const historyRecord = [...historyData].reverse().find(h => h['Nama Toko (Sistem)'] === storeName || h['Nama Toko'] === storeName);
+        const historyRecord = [...historyData].reverse().find(h => h['Nama Toko (Master)'] === storeName || h['Nama Toko (Sistem)'] === storeName || h['Nama Toko'] === storeName);
 
         let isDone = false; let photo = ''; let timestamp = ''; let surveyor = '-'; let rawPhotoUrl = ''; let oncStatus = 'No'; let distanceValidation = '-'; let outboxId = undefined;
         let surveyLat = ''; let surveyLng = '';
 
-        // --- UPDATE PENGAMBILAN NAMA TOKO AKTUAL ---
         let actualName = storeName;
 
         if (pendingRecord) {
@@ -489,12 +488,13 @@ export default function App() {
           surveyor = historyRecord['Nama Surveyor'] || historyRecord['Surveyor'] || '-';
           oncStatus = historyRecord['ONC?'] || historyRecord['ONC'] || 'No';
           distanceValidation = historyRecord['Jarak Validasi'] || historyRecord['Jarak'] || '-';
-          surveyLat = historyRecord['Lat'] || historyRecord['latitude'] || historyRecord['Latitude'] || '';
-          surveyLng = historyRecord['Long'] || historyRecord['longitude'] || historyRecord['Longitude'] || '';
 
-          // Deteksi kolom nama toko aktual dari App Script (berdasarkan screenshot)
-          if (historyRecord['Nam Toko Update'] || historyRecord['Nama Toko Update'] || historyRecord['updatedStoreName']) {
-            actualName = historyRecord['Nam Toko Update'] || historyRecord['Nama Toko Update'] || historyRecord['updatedStoreName'];
+          // Sesuaikan dengan header baru jika ada
+          surveyLat = historyRecord['Lat Aktual'] || historyRecord['Lat'] || historyRecord['latitude'] || historyRecord['Latitude'] || '';
+          surveyLng = historyRecord['Long Aktual'] || historyRecord['Long'] || historyRecord['longitude'] || historyRecord['Longitude'] || '';
+
+          if (historyRecord['Nama Toko Aktual'] || historyRecord['Nam Toko Update'] || historyRecord['Nama Toko Update'] || historyRecord['updatedStoreName']) {
+            actualName = historyRecord['Nama Toko Aktual'] || historyRecord['Nam Toko Update'] || historyRecord['Nama Toko Update'] || historyRecord['updatedStoreName'];
           }
         } else {
           rawPhotoUrl = item['Foto Toko'] || item['Link Foto'] || '';
@@ -505,17 +505,15 @@ export default function App() {
           distanceValidation = item['Jarak Validasi'] || item['Jarak'] || '-';
         }
 
-        // Jika actualName ternyata string kosong, kembalikan ke nama master
         if (!actualName || String(actualName).trim() === '') actualName = storeName;
 
-        // Simpan titik lat/long MASTER sebelum ketiban
-        const masterLat = item['Lat'] || item['latitude'] || item['Latitude'] || '';
-        const masterLng = item['Long'] || item['longitude'] || item['Longitude'] || '';
+        const masterLat = item['Lat Master'] || item['Lat'] || item['latitude'] || item['Latitude'] || '';
+        const masterLng = item['Long Master'] || item['Long'] || item['longitude'] || item['Longitude'] || '';
 
         return {
           ...item, ...historyRecord, id: index, name: storeName, actualName: actualName, Region: item['Region'] || item['region'] || '',
           kecamatan: item['kecamatan'] || item['Kecamatan'] || 'LAINNYA',
-          latitude: masterLat, // Tetap gunakan master untuk render map UI
+          latitude: masterLat,
           longitude: masterLng,
           masterLat, masterLng, surveyLat, surveyLng,
           address: item['Alamat'] || item['address'] || '',
@@ -584,11 +582,23 @@ export default function App() {
 
     const distance = calculateDistance(formData.gps.lat, formData.gps.lng, parseFloat(selectedStore?.latitude), parseFloat(selectedStore?.longitude));
 
+    // --- UPDATE PAYLOAD KE BACKEND: TAMBAHKAN masterLat dan masterLng ---
     const payload = {
       timestamp: new Date().toISOString(),
-      storeName: selectedStore?.name || '', updatedStoreName: formData.updatedStoreName, region: selectedStore?.Region || '', address: selectedStore?.address || '',
-      surveyor: formData.surveyorName, status: formData.visitStatus, notes: formData.visitNotes, onc: formData.onc, oncReason: formData.oncReason,
-      latitude: formData.gps.lat || 'Test_No_GPS', longitude: formData.gps.lng || 'Test_No_GPS', distanceValidation: distance !== null ? `${distance} meter` : 'Tidak tersedia',
+      storeName: selectedStore?.name || '',
+      updatedStoreName: formData.updatedStoreName,
+      region: selectedStore?.Region || '',
+      address: selectedStore?.address || '',
+      surveyor: formData.surveyorName,
+      status: formData.visitStatus,
+      notes: formData.visitNotes,
+      onc: formData.onc,
+      oncReason: formData.oncReason,
+      latitude: formData.gps.lat || 'Test_No_GPS',
+      longitude: formData.gps.lng || 'Test_No_GPS',
+      masterLat: selectedStore?.masterLat || '', // <--- DITAMBAHKAN
+      masterLng: selectedStore?.masterLng || '', // <--- DITAMBAHKAN
+      distanceValidation: distance !== null ? `${distance} meter` : 'Tidak tersedia',
       photo: formData.photo,
       signature: formData.signature
     };
@@ -613,7 +623,7 @@ export default function App() {
       ...s, isDone: true, photo: formData.photo, surveyor: formData.surveyorName, timestamp: payload.timestamp,
       onc: formData.onc, distanceValidation: payload.distanceValidation, outboxId: isOffline ? Date.now() : undefined,
       surveyLat: payload.latitude, surveyLng: payload.longitude,
-      actualName: payload.updatedStoreName || s.name // Update state dengan nama baru
+      actualName: payload.updatedStoreName || s.name
     } : s));
     if (isOffline) setOutboxItems(getOutbox());
 
@@ -723,7 +733,6 @@ export default function App() {
 
   const isFormValid = formData.surveyorName.trim().length > 1 && formData.photo !== null;
 
-  // --- UPDATE: MENAMBAHKAN NAMA TOKO MASTER & AKTUAL PADA CSV EXPORT ---
   const handleExportCSV = () => {
     if (filteredSuccessStores.length === 0) return alert("Belum ada data untuk diekspor!");
     const headers = [
@@ -778,7 +787,6 @@ export default function App() {
     return "Search Data Toko...";
   }
 
-  // --- LAYAR LOGIN ---
   if (authRole === 'guest') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -812,14 +820,9 @@ export default function App() {
     );
   }
 
-  // --- LAYAR UTAMA APLIKASI ---
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
-
-      {/* OVERLAY MOBILE */}
       {isSidebarExpanded && <div className="fixed inset-0 z-40 bg-slate-900/50 sm:hidden transition-opacity" onClick={() => setIsSidebarExpanded(false)} />}
-
-      {/* SIDEBAR */}
       <aside className={`fixed sm:relative top-0 left-0 h-full z-50 flex-shrink-0 flex flex-col bg-white border-r border-slate-200 transition-all duration-300 overflow-y-auto ${isSidebarExpanded ? 'w-64 translate-x-0' : 'w-[72px] -translate-x-full sm:translate-x-0'}`}>
         <div className="p-3 flex flex-col gap-2 mt-2 flex-1">
           {menuItems.map(menu => (
@@ -832,7 +835,6 @@ export default function App() {
           ))}
         </div>
 
-        {/* Fitur Logout */}
         <div className="p-3 border-t border-slate-100">
           <button onClick={handleLogout} className={`w-full flex items-center gap-3 p-3 rounded-xl text-sm font-black uppercase text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-100 transition-all overflow-hidden ${!isSidebarExpanded && 'justify-center'}`} title="Logout">
             <LogOut size={20} className="shrink-0" />
@@ -842,8 +844,6 @@ export default function App() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 bg-white shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.05)] z-40 relative">
-
-        {/* HEADER */}
         <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between z-40 h-[64px]">
           <div className="flex items-center gap-3">
             <button onClick={() => setIsSidebarExpanded(!isSidebarExpanded)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors" title="Toggle Sidebar"><Menu size={22} /></button>
@@ -862,14 +862,13 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            {/* Indikator Offline / Sync Button */}
             {outboxItems.length > 0 && (
               <button onClick={handleSyncOutbox} disabled={isSyncingOutbox} className="hidden sm:flex items-center gap-1.5 bg-amber-500 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider hover:bg-amber-600 transition-colors shadow-sm animate-pulse disabled:opacity-50">
                 {isSyncingOutbox ? <RefreshCw size={12} className="animate-spin" /> : <CloudLightning size={12} />}
                 Sync ({outboxItems.length})
               </button>
             )}
-            {outboxItems.length > 0 && ( // Mobile only compact sync
+            {outboxItems.length > 0 && (
               <button onClick={handleSyncOutbox} disabled={isSyncingOutbox} className="sm:hidden p-2 bg-amber-100 text-amber-600 rounded-full animate-pulse"><CloudLightning size={16} /></button>
             )}
 
@@ -880,16 +879,13 @@ export default function App() {
           </div>
         </header>
 
-        {/* MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto bg-[#f8fafc]">
-
           <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sticky top-0 z-30 shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-2">
               {menuItems.find(m => m.id === activeMenu)?.icon && React.createElement(menuItems.find(m => m.id === activeMenu).icon, { size: 18, className: "text-slate-400" })}
               <h2 className="text-sm font-bold text-slate-700 tracking-wide uppercase">{menuItems.find(m => m.id === activeMenu)?.label}</h2>
             </div>
 
-            {/* AKSI HEADER KHUSUS TAB LIST VALIDASI */}
             {activeMenu === 'list' && (
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={toggleSortByNearest} className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all border ${sortByNearest ? 'bg-amber-50 text-amber-600 border-amber-300 shadow-sm ring-1 ring-amber-500/20' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`} title="Urutkan Terdekat">
@@ -913,11 +909,8 @@ export default function App() {
               </div>
             ) : (
               <>
-                {/* VIEW 1: LIST VALIDASI */}
                 {activeMenu === 'list' && (
                   <div className="max-w-7xl mx-auto relative">
-
-                    {/* Dashboard Quick Stats & Filter */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-in fade-in duration-500">
                       <div className="flex gap-4 sm:gap-8 justify-around md:justify-start flex-1 px-2">
                         <div className="text-center md:text-left">
@@ -984,7 +977,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* VIEW 2: MAP OF LOCATION */}
                 {activeMenu === 'map' && (
                   <div className="w-full h-[calc(100vh-160px)] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative animate-in fade-in zoom-in-95 duration-500 flex">
                     <div className="flex-1 relative h-full">
@@ -995,7 +987,6 @@ export default function App() {
                       <GlobalMap stores={mapStores} onMarkerClick={setSelectedMapStore} isScriptsReady={isScriptsReady} />
                     </div>
 
-                    {/* SIDE PANEL DETAIL TOKO */}
                     {selectedMapStore && (
                       <div className="absolute md:relative right-0 top-0 h-full w-full md:w-80 lg:w-[380px] bg-white border-l border-slate-200 flex flex-col z-[1001] animate-in slide-in-from-right-8 duration-300 shadow-2xl md:shadow-none">
                         <div className="p-4 border-b border-slate-100 flex justify-between items-start bg-slate-50 sticky top-0">
@@ -1069,7 +1060,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* VIEW 3: DATA GALLERY (Admin Only) */}
                 {activeMenu === 'gallery' && (
                   <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
@@ -1115,7 +1105,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* VIEW 4: LIST TOKO SUKSES TERVALIDASI (Admin Only) */}
                 {activeMenu === 'success' && (
                   <div className="max-w-5xl mx-auto animate-in fade-in duration-500">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-4">
@@ -1175,7 +1164,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* VIEW 5: DASHBOARD SEDERHANA (Admin Only) */}
                 {activeMenu === 'dashboard' && (
                   <div className="max-w-5xl mx-auto animate-in fade-in duration-500 space-y-6">
                     <div className="flex items-center gap-4 mb-6">
@@ -1239,7 +1227,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* VIEW 6: ABOUT */}
                 {activeMenu === 'about' && (
                   <div className="max-w-4xl mx-auto animate-in fade-in duration-500 pt-4 pb-12">
                     <div className="bg-white rounded-[24px] shadow-sm border border-slate-200 overflow-hidden">
@@ -1283,7 +1270,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* VIEW 7: FEEDBACK */}
                 {activeMenu === 'feedback' && (
                   <div className="max-w-3xl mx-auto animate-in fade-in duration-500 pt-4">
                     <div className="bg-white rounded-[24px] shadow-sm border border-slate-200 overflow-hidden p-6 md:p-10">
@@ -1308,7 +1294,6 @@ export default function App() {
         </main>
       </div>
 
-      {/* FITUR 3: FLOATING BUTTON ROUTE CART */}
       {routeCart.length > 0 && activeMenu === 'list' && (
         <button
           onClick={() => setIsRouteModalOpen(true)}
@@ -1320,11 +1305,6 @@ export default function App() {
         </button>
       )}
 
-      {/* =========================================================
-          SEMUA MODAL / POP-UP DIPINDAHKAN KE SINI (ROOT LEVEL)
-          ========================================================= */}
-
-      {/* MODAL RUTE (FITUR 3) */}
       {isRouteModalOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-lg rounded-[24px] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden border border-slate-100">
@@ -1356,7 +1336,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DETAIL TOKO SUKSES */}
       {selectedSuccessStore && (() => {
         const distanceStrSuccess = selectedSuccessStore['Jarak Validasi'] || selectedSuccessStore.distanceValidation || 'N/A';
         const isFarSuccess = checkDistanceWarning(distanceStrSuccess);
@@ -1399,7 +1378,6 @@ export default function App() {
         );
       })()}
 
-      {/* MODAL LIGHTBOX GALLERY (POP-UP FOTO BESAR) */}
       {selectedGalleryStore && (() => {
         const distanceStrLight = selectedGalleryStore['Jarak Validasi'] || selectedGalleryStore.distanceValidation || '-';
         const isFarLight = checkDistanceWarning(distanceStrLight);
@@ -1434,7 +1412,6 @@ export default function App() {
         );
       })()}
 
-      {/* MODAL FORM SURVEI */}
       {isFormOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-lg rounded-[24px] shadow-2xl flex flex-col max-h-[96vh] overflow-hidden border border-slate-100">
@@ -1575,7 +1552,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL FILTER KECAMATAN */}
       {isFilterModalOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-lg rounded-[24px] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden border border-slate-100">
