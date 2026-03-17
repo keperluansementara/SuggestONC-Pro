@@ -124,16 +124,13 @@ const applyWatermark = (base64Image, metadataStrArray) => {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
 
-      // Hitung tinggi background hitam berdasarkan jumlah baris metadata
       const fontSize = Math.max(14, Math.floor(canvas.width * 0.03));
       const padding = fontSize;
       const boxHeight = (metadataStrArray.length * (fontSize * 1.5)) + (padding * 2);
 
-      // Gambar gradient hitam semi transparan di bawah
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.fillRect(0, canvas.height - boxHeight, canvas.width, boxHeight);
 
-      // Tulis teks watermark
       ctx.font = `bold ${fontSize}px sans-serif`;
       ctx.fillStyle = '#ffffff';
       ctx.textBaseline = 'top';
@@ -144,10 +141,9 @@ const applyWatermark = (base64Image, metadataStrArray) => {
         currentY += (fontSize * 1.5);
       });
 
-      // Kembalikan base64 hasil kompresi (kualitas 0.8)
       resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
-    img.onerror = () => resolve(base64Image); // Jika error, kembalikan gambar asli
+    img.onerror = () => resolve(base64Image);
     img.src = base64Image;
   });
 };
@@ -389,7 +385,6 @@ const StoreCard = ({ store, onClick, currentDistance, onToggleRoute, isInRoute }
 
 // --- APP UTAMA ---
 export default function App() {
-  // FITUR 6: LOGIN STATE
   const [authRole, setAuthRole] = useState(localStorage.getItem('shp_auth_role') || 'guest');
   const [loginPin, setLoginPin] = useState('');
 
@@ -408,14 +403,10 @@ export default function App() {
   const [isLocatingSort, setIsLocatingSort] = useState(false);
   const [visibleCount, setVisibleCount] = useState(100);
 
-  // Script Maps Loader State
   const [isScriptsReady, setIsScriptsReady] = useState(false);
-
-  // FITUR 3: KERNJANG RUTE
   const [routeCart, setRouteCart] = useState([]);
   const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
 
-  // FITUR 1: OFFLINE OUTBOX STATE
   const [outboxItems, setOutboxItems] = useState(getOutbox());
   const [isSyncingOutbox, setIsSyncingOutbox] = useState(false);
 
@@ -429,12 +420,11 @@ export default function App() {
   const [gpsError, setGpsError] = useState(null);
 
   const [formData, setFormData] = useState({
-    surveyorName: getSavedSurveyorName(), // FITUR 5: Remember Me Init
+    surveyorName: getSavedSurveyorName(),
     updatedStoreName: '', visitStatus: 'Sudah Tersurvei', visitNotes: '',
     onc: 'No', oncReason: '', photo: null, gps: { lat: null, lng: null }, signature: null, gpsLoading: false
   });
 
-  // Load Scripts for Leaflet & Cluster
   useEffect(() => {
     const css1 = document.createElement('link'); css1.rel = 'stylesheet'; css1.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css1);
     const css2 = document.createElement('link'); css2.rel = 'stylesheet'; css2.href = 'https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css'; document.head.appendChild(css2);
@@ -449,7 +439,6 @@ export default function App() {
 
     return () => {
       [css1, css2, css3, script1].forEach(el => el && el.parentNode && el.parentNode.removeChild(el));
-      // script2 is hard to remove cleanly here, but it's fine for SPA
     };
   }, []);
 
@@ -472,14 +461,14 @@ export default function App() {
 
       const mappedStores = masterData.map((item, index) => {
         const storeName = item['Nama Toko'] || item['name'] || '';
-
-        // Cek Outbox Lokal dulu (Prioritas tertinggi jika belum sync)
         const pendingRecord = localOutbox.find(o => o.storeName === storeName);
-
-        // Cek History Cloud
         const historyRecord = [...historyData].reverse().find(h => h['Nama Toko (Sistem)'] === storeName || h['Nama Toko'] === storeName);
 
         let isDone = false; let photo = ''; let timestamp = ''; let surveyor = '-'; let rawPhotoUrl = ''; let oncStatus = 'No'; let distanceValidation = '-'; let outboxId = undefined;
+        let surveyLat = ''; let surveyLng = '';
+
+        // --- UPDATE PENGAMBILAN NAMA TOKO AKTUAL ---
+        let actualName = storeName;
 
         if (pendingRecord) {
           photo = pendingRecord.photo;
@@ -489,6 +478,9 @@ export default function App() {
           oncStatus = pendingRecord.onc;
           distanceValidation = pendingRecord.distanceValidation;
           outboxId = pendingRecord.outboxId;
+          surveyLat = pendingRecord.latitude;
+          surveyLng = pendingRecord.longitude;
+          if (pendingRecord.updatedStoreName) actualName = pendingRecord.updatedStoreName;
         } else if (historyRecord) {
           rawPhotoUrl = historyRecord['Link Foto'] || historyRecord['Foto Toko'] || '';
           photo = getDirectImageUrl(rawPhotoUrl);
@@ -497,6 +489,13 @@ export default function App() {
           surveyor = historyRecord['Nama Surveyor'] || historyRecord['Surveyor'] || '-';
           oncStatus = historyRecord['ONC?'] || historyRecord['ONC'] || 'No';
           distanceValidation = historyRecord['Jarak Validasi'] || historyRecord['Jarak'] || '-';
+          surveyLat = historyRecord['Lat'] || historyRecord['latitude'] || historyRecord['Latitude'] || '';
+          surveyLng = historyRecord['Long'] || historyRecord['longitude'] || historyRecord['Longitude'] || '';
+
+          // Deteksi kolom nama toko aktual dari App Script (berdasarkan screenshot)
+          if (historyRecord['Nam Toko Update'] || historyRecord['Nama Toko Update'] || historyRecord['updatedStoreName']) {
+            actualName = historyRecord['Nam Toko Update'] || historyRecord['Nama Toko Update'] || historyRecord['updatedStoreName'];
+          }
         } else {
           rawPhotoUrl = item['Foto Toko'] || item['Link Foto'] || '';
           photo = getDirectImageUrl(rawPhotoUrl);
@@ -506,10 +505,20 @@ export default function App() {
           distanceValidation = item['Jarak Validasi'] || item['Jarak'] || '-';
         }
 
+        // Jika actualName ternyata string kosong, kembalikan ke nama master
+        if (!actualName || String(actualName).trim() === '') actualName = storeName;
+
+        // Simpan titik lat/long MASTER sebelum ketiban
+        const masterLat = item['Lat'] || item['latitude'] || item['Latitude'] || '';
+        const masterLng = item['Long'] || item['longitude'] || item['Longitude'] || '';
+
         return {
-          ...item, ...historyRecord, id: index, name: storeName, Region: item['Region'] || item['region'] || '',
-          kecamatan: item['kecamatan'] || item['Kecamatan'] || 'LAINNYA', latitude: item['Lat'] || item['latitude'] || item['Latitude'] || '',
-          longitude: item['Long'] || item['longitude'] || item['Longitude'] || '', address: item['Alamat'] || item['address'] || '',
+          ...item, ...historyRecord, id: index, name: storeName, actualName: actualName, Region: item['Region'] || item['region'] || '',
+          kecamatan: item['kecamatan'] || item['Kecamatan'] || 'LAINNYA',
+          latitude: masterLat, // Tetap gunakan master untuk render map UI
+          longitude: masterLng,
+          masterLat, masterLng, surveyLat, surveyLng,
+          address: item['Alamat'] || item['address'] || '',
           isDone, photo, rawPhotoUrl, timestamp, surveyor, onc: oncStatus, distanceValidation, outboxId
         };
       });
@@ -521,7 +530,6 @@ export default function App() {
   useEffect(() => { if (authRole !== 'guest') fetchData(); }, [fetchData, authRole]);
   useEffect(() => { setVisibleCount(100); }, [searchQuery, statusFilter, selectedKecamatans, sortByNearest]);
 
-  // FITUR 1: FUNGSI SYNC OUTBOX LOKAL KE CLOUD
   const handleSyncOutbox = async () => {
     if (!navigator.onLine) return alert("Anda masih offline. Cari sinyal internet dulu.");
     setIsSyncingOutbox(true);
@@ -539,7 +547,7 @@ export default function App() {
     setIsSyncingOutbox(false);
     if (successCount > 0) {
       alert(`Berhasil sinkronisasi ${successCount} data ke server!`);
-      fetchData(); // Refresh UI
+      fetchData();
     } else {
       alert("Gagal sinkronisasi. Coba lagi nanti.");
     }
@@ -561,7 +569,7 @@ export default function App() {
 
   useEffect(() => {
     if (isFormOpen) {
-      setFormData(prev => ({ ...prev, gps: { lat: null, lng: null }, updatedStoreName: selectedStore?.name || '', surveyorName: getSavedSurveyorName() }));
+      setFormData(prev => ({ ...prev, gps: { lat: null, lng: null }, updatedStoreName: selectedStore?.actualName || selectedStore?.name || '', surveyorName: getSavedSurveyorName() }));
       setGpsError(null);
       setTimeout(() => getLocation(), 800);
     }
@@ -572,7 +580,6 @@ export default function App() {
     if (!formData.surveyorName || !formData.photo) return;
     setIsSubmitting(true);
 
-    // FITUR 5: Simpan nama surveyor agar tidak ngetik ulang
     saveSurveyorName(formData.surveyorName);
 
     const distance = calculateDistance(formData.gps.lat, formData.gps.lng, parseFloat(selectedStore?.latitude), parseFloat(selectedStore?.longitude));
@@ -582,11 +589,10 @@ export default function App() {
       storeName: selectedStore?.name || '', updatedStoreName: formData.updatedStoreName, region: selectedStore?.Region || '', address: selectedStore?.address || '',
       surveyor: formData.surveyorName, status: formData.visitStatus, notes: formData.visitNotes, onc: formData.onc, oncReason: formData.oncReason,
       latitude: formData.gps.lat || 'Test_No_GPS', longitude: formData.gps.lng || 'Test_No_GPS', distanceValidation: distance !== null ? `${distance} meter` : 'Tidak tersedia',
-      photo: formData.photo, // Ini sudah watermarked dari handlePhotoCapture
+      photo: formData.photo,
       signature: formData.signature
     };
 
-    // FITUR 1: OFFLINE CHECK & SAVE
     if (!navigator.onLine) {
       saveToOutbox(payload);
       updateUIOnSuccess(payload, true);
@@ -597,7 +603,6 @@ export default function App() {
       await fetch(GOOGLE_SHEETS_WEBAPP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
       updateUIOnSuccess(payload, false);
     } catch {
-      // Jika gagal fetch (misal tiba-tiba internet putus saat ngirim), simpan ke outbox
       saveToOutbox(payload);
       updateUIOnSuccess(payload, true);
     }
@@ -606,7 +611,9 @@ export default function App() {
   const updateUIOnSuccess = (payload, isOffline) => {
     setStores(prev => prev.map(s => s.id === selectedStore.id ? {
       ...s, isDone: true, photo: formData.photo, surveyor: formData.surveyorName, timestamp: payload.timestamp,
-      onc: formData.onc, distanceValidation: payload.distanceValidation, outboxId: isOffline ? Date.now() : undefined
+      onc: formData.onc, distanceValidation: payload.distanceValidation, outboxId: isOffline ? Date.now() : undefined,
+      surveyLat: payload.latitude, surveyLng: payload.longitude,
+      actualName: payload.updatedStoreName || s.name // Update state dengan nama baru
     } : s));
     if (isOffline) setOutboxItems(getOutbox());
 
@@ -618,7 +625,6 @@ export default function App() {
     }, 2000);
   }
 
-  // FITUR 2: AUTO WATERMARK TRIGGER SAAT FOTO DIAMBIL
   const handlePhotoCapture = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -627,7 +633,6 @@ export default function App() {
     reader.onloadend = async () => {
       const originalBase64 = reader.result;
 
-      // Siapkan teks Watermark
       const dist = calculateDistance(formData.gps.lat, formData.gps.lng, parseFloat(selectedStore?.latitude), parseFloat(selectedStore?.longitude));
       const distText = dist !== null ? `${dist} meter` : 'N/A';
       const gpsText = formData.gps.lat ? `${formData.gps.lat.toFixed(5)}, ${formData.gps.lng.toFixed(5)}` : 'GPS Tidak Terlacak';
@@ -639,7 +644,6 @@ export default function App() {
         `SURVEYOR: ${formData.surveyorName || 'Anonim'}`
       ];
 
-      // Terapkan watermark
       const watermarkedBase64 = await applyWatermark(originalBase64, watermarkLines);
       setFormData(prev => ({ ...prev, photo: watermarkedBase64 }));
     };
@@ -648,18 +652,12 @@ export default function App() {
 
   const openInGoogleMaps = (lat, lng) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
 
-  // FITUR 3: GENERATE GOOGLE MAPS ROUTE URL UNTUK BANYAK TITIK
   const generateRouteUrl = () => {
     if (routeCart.length === 0) return;
     if (routeCart.length === 1) return openInGoogleMaps(routeCart[0].latitude, routeCart[0].longitude);
 
-    // Titik akhir adalah elemen terakhir di array
     const destination = routeCart[routeCart.length - 1];
-
-    // Titik tengah (waypoints) adalah elemen index 0 s/d (length - 2)
-    const waypoints = routeCart.slice(0, routeCart.length - 1)
-      .map(s => `${s.latitude},${s.longitude}`)
-      .join('|');
+    const waypoints = routeCart.slice(0, routeCart.length - 1).map(s => `${s.latitude},${s.longitude}`).join('|');
 
     let url = `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}&travelmode=driving`;
     if (waypoints.length > 0) url += `&waypoints=${waypoints}`;
@@ -688,15 +686,8 @@ export default function App() {
     );
   };
 
-
-  // =========================================================================================
-  // SISTEM FILTER PUSAT (MEMPERBAIKI BUG PENCARIAN DI MAP, GALLERY, DAN SUCCESS TAB)
-  // =========================================================================================
-
-  // 1. Filter Khusus Untuk Pencarian Teks (Search Bar) - Berlaku Global
   const searchMatch = (s) => !searchQuery || Object.values(s).some(value => String(value).toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // 2. Filter Untuk TAB LIST VALIDASI
   let filteredStores = stores.filter(s => {
     const isSearchMatch = searchMatch(s);
     const isStatusMatch = statusFilter === 'all' ? true : (statusFilter === 'done' ? (s.isDone || s.outboxId) : (!s.isDone && !s.outboxId));
@@ -718,35 +709,37 @@ export default function App() {
   const uniqueKecamatans = [...new Set(stores.map(s => s.kecamatan || 'LAINNYA'))].sort();
   const groupedDataFull = stores.reduce((acc, s) => { const k = s.kecamatan || 'LAINNYA'; if (!acc[k]) acc[k] = []; acc[k].push(s); return acc; }, {});
 
-  // 3. BASE DATA UNTUK TAB LAINNYA & DASHBOARD (Tanpa Filter)
   const successStores = stores.filter(s => s.isDone || s.outboxId);
   const galleryStores = stores.filter(s => (s.isDone || s.outboxId) && s.photo);
-
-  // 4. Filter Untuk TAB MAP OF LOCATION (Sekarang terhubung ke Search Bar!)
   const mapStores = stores.filter(s => searchMatch(s));
 
-  // 5. Filter Untuk TAB DATA GALLERY (Sekarang terhubung ke Search Bar!)
   const filteredGalleryStores = galleryStores.filter(s => {
     return searchMatch(s) && (galleryFilter === 'all' ? true : s.onc === galleryFilter);
   }).sort((a, b) => parseDateForSort(b.timestamp) - parseDateForSort(a.timestamp));
 
-  // 6. Filter Untuk TAB LIST TOKO SUKSES (Sekarang terhubung ke Search Bar!)
   const filteredSuccessStores = successStores.filter(s => {
     return searchMatch(s) && (successFilter === 'all' ? true : s.onc === successFilter);
   }).sort((a, b) => parseDateForSort(b.timestamp) - parseDateForSort(a.timestamp));
 
-  // =========================================================================================
-
   const isFormValid = formData.surveyorName.trim().length > 1 && formData.photo !== null;
 
+  // --- UPDATE: MENAMBAHKAN NAMA TOKO MASTER & AKTUAL PADA CSV EXPORT ---
   const handleExportCSV = () => {
     if (filteredSuccessStores.length === 0) return alert("Belum ada data untuk diekspor!");
-    const headers = ["Nama Toko", "Region", "Surveyor", "Waktu Validasi", "Status", "Jarak Validasi", "ONC?", "Catatan", "Link Foto Asli", "Sync Status"];
+    const headers = [
+      "Nama Toko (Master)", "Nama Toko (Aktual)", "Region", "Surveyor", "Waktu Validasi", "Status",
+      "Lat Awal (Master)", "Long Awal (Master)",
+      "Lat Akhir (Aktual)", "Long Akhir (Aktual)",
+      "Jarak Validasi", "ONC?", "Catatan", "Link Foto Asli", "Sync Status"
+    ];
     const csvContent = [
       headers.join(","),
       ...filteredSuccessStores.map(store => [
-        `"${store.name || ''}"`, `"${store.Region || ''}"`, `"${store.surveyor || ''}"`, `"${formatDateTime(store.timestamp) || ''}"`,
-        `"${store['Status Visit'] || store.status || 'Sudah Tersurvei'}"`, `"${store['Jarak Validasi'] || store.distanceValidation || '-'}"`,
+        `"${store.name || ''}"`, `"${store.actualName || store.name || ''}"`, `"${store.Region || ''}"`, `"${store.surveyor || ''}"`, `"${formatDateTime(store.timestamp) || ''}"`,
+        `"${store['Status Visit'] || store.status || 'Sudah Tersurvei'}"`,
+        `"${store.masterLat || ''}"`, `"${store.masterLng || ''}"`,
+        `"${store.surveyLat || ''}"`, `"${store.surveyLng || ''}"`,
+        `"${store['Jarak Validasi'] || store.distanceValidation || '-'}"`,
         `"${store['ONC?'] || store.onc || '-'}"`, `"${(store['Catatan'] || store.notes || '').replace(/"/g, '""')}"`, `"${store.rawPhotoUrl || ''}"`,
         `"${store.outboxId ? 'OFFLINE PENDING' : 'SYNCED'}"`
       ].join(","))
@@ -755,7 +748,6 @@ export default function App() {
     link.setAttribute("href", url); link.setAttribute("download", `Data_Toko_${new Date().toISOString().slice(0, 10)}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // FITUR 6: LOGIC ROLE MENU
   const allMenuItems = [
     { id: 'list', label: 'List Validasi', icon: List, roles: ['admin', 'surveyor'] },
     { id: 'map', label: 'Map of Location', icon: MapPin, roles: ['admin', 'surveyor'] },
@@ -779,7 +771,6 @@ export default function App() {
     setAuthRole('guest'); localStorage.removeItem('shp_auth_role');
   }
 
-  // Menentukan Teks Placeholder di Search Bar Berdasarkan Menu Aktif
   const getSearchPlaceholder = () => {
     if (activeMenu === 'map') return "Cari Toko/Daerah di Peta...";
     if (activeMenu === 'gallery') return "Cari nama toko/surveyor...";
@@ -795,7 +786,7 @@ export default function App() {
           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-blue-600 to-cyan-500"></div>
           <div className="relative z-10 flex flex-col items-center pt-8">
             <div className="w-24 h-24 bg-white rounded-2xl shadow-md border-[4px] border-white flex items-center justify-center p-2 mb-6">
-              <img src="SHP.png" alt="Logo" className="w-full h-full object-contain scale-[1.3] drop-shadow-sm" />
+              <img src="/SHP.png" alt="Logo" className="w-full h-full object-contain scale-[1.3] drop-shadow-sm" />
             </div>
             <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight text-center">Login Sistem Survei</h1>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 mb-8 text-center">Internal Use Only</p>
@@ -885,7 +876,7 @@ export default function App() {
             <button onClick={fetchData} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors" title="Sync Data dari Cloud">
               <RefreshCw size={18} className={loading ? 'animate-spin text-blue-600' : ''} />
             </button>
-            <div className="w-8 h-8 rounded-full border border-slate-200 overflow-hidden bg-white p-0.5"><img src="SHP.png" alt="Profile" className="w-full h-full object-contain scale-[1.3]" /></div>
+            <div className="w-8 h-8 rounded-full border border-slate-200 overflow-hidden bg-white p-0.5"><img src="/SHP.png" alt="Profile" className="w-full h-full object-contain scale-[1.3]" /></div>
           </div>
         </header>
 
@@ -1001,7 +992,6 @@ export default function App() {
                         <button className="px-5 py-2 text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-800 border-r border-slate-200 hover:bg-slate-200 transition-colors">Peta</button>
                         <button className="px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-50 transition-colors">Satelit</button>
                       </div>
-                      {/* --- MAP SEKARANG MENGGUNAKAN mapStores YANG TERHUBUNG KE SEARCH BAR --- */}
                       <GlobalMap stores={mapStores} onMarkerClick={setSelectedMapStore} isScriptsReady={isScriptsReady} />
                     </div>
 
@@ -1031,7 +1021,7 @@ export default function App() {
                               <table className="w-full text-left text-xs">
                                 <tbody className="divide-y divide-slate-100">
                                   {Object.entries(selectedMapStore).map(([key, value]) => {
-                                    if (['id', 'isDone', 'latitude', 'longitude', 'photo', 'surveyor', 'timestamp', 'rawPhotoUrl', 'name', 'Region', 'Link Foto', 'Foto Toko', 'Ttd Toko', 'outboxId'].includes(key)) return null;
+                                    if (['id', 'isDone', 'latitude', 'longitude', 'photo', 'surveyor', 'timestamp', 'rawPhotoUrl', 'name', 'actualName', 'Region', 'Link Foto', 'Foto Toko', 'Ttd Toko', 'outboxId', 'masterLat', 'masterLng', 'surveyLat', 'surveyLng'].includes(key)) return null;
                                     if (!value || value === '-') return null;
                                     return (
                                       <tr key={key} className="hover:bg-blue-50/50 transition-colors">
@@ -1044,10 +1034,22 @@ export default function App() {
                                       </tr>
                                     )
                                   })}
+                                  {selectedMapStore.actualName !== selectedMapStore.name && (
+                                    <tr className="hover:bg-blue-50/50 transition-colors">
+                                      <td className="p-3 py-2.5 font-bold text-slate-500 w-[40%] align-top">Nama Aktual</td>
+                                      <td className="p-3 py-2.5 font-medium text-blue-600 break-words flex flex-col gap-1"><span>{selectedMapStore.actualName}</span></td>
+                                    </tr>
+                                  )}
                                   <tr className="hover:bg-blue-50/50 transition-colors">
-                                    <td className="p-3 py-2.5 font-bold text-slate-500 w-[40%] align-top">Koordinat</td>
-                                    <td className="p-3 py-2.5 font-medium text-slate-800 break-words flex flex-col gap-1"><span>{selectedMapStore.latitude}, {selectedMapStore.longitude}</span></td>
+                                    <td className="p-3 py-2.5 font-bold text-slate-500 w-[40%] align-top">Koordinat Awal</td>
+                                    <td className="p-3 py-2.5 font-medium text-slate-800 break-words flex flex-col gap-1"><span>{selectedMapStore.masterLat || '-'}, {selectedMapStore.masterLng || '-'}</span></td>
                                   </tr>
+                                  {selectedMapStore.isDone && (
+                                    <tr className="hover:bg-blue-50/50 transition-colors">
+                                      <td className="p-3 py-2.5 font-bold text-slate-500 w-[40%] align-top">Koordinat Aktual</td>
+                                      <td className="p-3 py-2.5 font-medium text-blue-600 break-words flex flex-col gap-1"><span>{selectedMapStore.surveyLat || '-'}, {selectedMapStore.surveyLng || '-'}</span></td>
+                                    </tr>
+                                  )}
                                 </tbody>
                               </table>
                             </div>
@@ -1244,7 +1246,7 @@ export default function App() {
                       <div className="h-40 bg-gradient-to-r from-blue-600 to-cyan-500 relative">
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
                         <div className="absolute -bottom-12 left-8 md:left-10 w-[200px] md:w-[240px] h-[90px] md:h-[110px] bg-white rounded-3xl shadow-xl border-[4px] border-white flex items-center justify-center z-10 overflow-hidden p-1">
-                          <img src="SHP.png" alt="SHP Logo" className="w-full h-full object-contain scale-[1.35] drop-shadow-sm" />
+                          <img src="/SHP.png" alt="SHP Logo" className="w-full h-full object-contain scale-[1.35] drop-shadow-sm" />
                         </div>
                         <div className="absolute top-4 right-4 flex gap-2">
                           <span className="bg-black/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-white text-[10px] font-black uppercase tracking-widest">Internal Use Only</span>
